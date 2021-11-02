@@ -1,6 +1,6 @@
-from ast import Param
 import sys
 import subprocess
+import hanzidentifier
 
 class Font:
     def __init__(self, unicode:str):
@@ -15,10 +15,10 @@ class Font:
             return f'invalid:{err.reason}'
     
     def is_traditional(self):
-        return False
+        return hanzidentifier.is_traditional(self.char)
 
     def is_simplified(self):
-        return False
+        return hanzidentifier.is_simplified(self.char)
 
 class TtfFile:
     def __init__(self, path:str):
@@ -34,8 +34,25 @@ class TtfFile:
             f = Font(unicode)
             self.fonts.append(f)
 
+    def get_traditional_cnt(self):
+        cnt = 0
+        for f in self.fonts:
+            cnt += 1 if f.is_traditional() else 0
+        return cnt
+                
+    def get_simplified_cnt(self):
+        cnt = 0
+        for f in self.fonts:
+            cnt += 1 if f.is_simplified() else 0
+        return cnt
+    
+    def __str__(self):
+        return f'{self.path}\t{self.get_traditional_cnt()}\t{self.get_simplified_cnt()}'
+
 if __name__ == '__main__':
-    # file_path = sys.argv[1]
-    file_path = "汉仪槑萌体.TTF"
+    file_path = sys.argv[1]
+    print(file_path)
     t = TtfFile(file_path)
     t.analysis()
+    print('File\t繁體\t簡體')
+    print(t)
