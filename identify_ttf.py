@@ -69,15 +69,18 @@ class TtfSortor:
         return self.ttf_files
 
     def classify(self):
-        traditional_dir = self.dir + '/traditional'
-        simplified_dir = self.dir + '/simplified'
+        traditional_dir = self.dir + '/繁體'
+        simplified_dir = self.dir + '/簡體'
         if not os.path.exists(traditional_dir):
             os.mkdir(traditional_dir)
         if not os.path.exists(simplified_dir):
             os.mkdir(simplified_dir)
         
         for f in self.ttf_files:
-            if f.get_traditional_cnt() > 9000:
+            tra_cnt = f.get_traditional_cnt()
+            sim_cnt = f.get_simplified_cnt()
+            print(f'{f.path}\t繁體:{tra_cnt}\t簡體:{sim_cnt}')
+            if tra_cnt > 9000:
                 f.move(traditional_dir)
             else:
                 f.move(simplified_dir)
