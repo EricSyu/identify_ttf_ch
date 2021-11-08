@@ -6,15 +6,18 @@ import shutil
 
 class Font:
     def __init__(self, unicode:str):
-        self.unicode = unicode
-        self.char = self.__to_char(unicode)
+        self._unicode = unicode
+        self._char = ''
     
-    def __to_char(self, unicode:str):
-        try:
-            b = bytes.fromhex(unicode)
-            return b.decode('utf_16_be')
-        except UnicodeDecodeError as err:
-            return f'invalid:{err.reason}'
+    @property
+    def char(self):
+        if self._char == '':
+            try:
+                b = bytes.fromhex(self._unicode)
+                self._char = b.decode('utf_16_be')
+            except UnicodeDecodeError as err:
+                self._char = f'invalid:{err.reason}'
+        return self._char
     
     def is_traditional(self):
         return hanzidentifier.is_traditional(self.char)
@@ -24,73 +27,81 @@ class Font:
 
 class TtfFile:
     def __init__(self, path:str):
-        self.path = path
-        self.fonts = []
-        self.tra_cnt = -1
-        self.sim_cnt = -1
+        self._path = path
+        self._fonts = []
+        self._traditional_cnt = -1
+        self._simplified_cnt = -1
 
-    def parse(self):
-        comp_proc = subprocess.run(['otfinfo', '-u', self.path], capture_output = True)
-        output = comp_proc.stdout.decode('utf-8')
-        lines = output.split('\n')
-        for l in lines:
-            unicode = l.split(' ')[0].replace('uni', '')
-            f = Font(unicode)
-            self.fonts.append(f)
+    @property
+    def path(self):
+        return self._path
 
-    def get_traditional_cnt(self):
-        if self.tra_cnt == -1:
-            cnt = 0
+    @property
+    def fonts(self):
+        if len(self._fonts) == 0:
+            comp_proc = subprocess.run(['otfinfo', '-u', self._path], capture_output = True)
+            output = comp_proc.stdout.decode('utf-8')
+            lines = output.split('\n')
+            for l in lines:
+                unicode = l.split(' ')[0].replace('uni', '')
+                f = Font(unicode)
+                self._fonts.append(f)
+        return self._fonts
+
+    @property
+    def traditional_cnt(self):
+        if self._traditional_cnt == -1:
+            self._traditional_cnt = 0
             for f in self.fonts:
-                cnt += 1 if f.is_traditional() else 0
-            self.tra_cnt = cnt
-        return self.tra_cnt
+                self._traditional_cnt += 1 if f.is_traditional() else 0
+        return self._traditional_cnt
     
-    def get_simplified_cnt(self):
-        if self.sim_cnt == -1:
-            cnt = 0
+    @property
+    def simplified_cnt(self):
+        if self._simplified_cnt == -1:
+            self._simplified_cnt = 0
             for f in self.fonts:
-                cnt += 1 if f.is_simplified() else 0
-            self.sim_cnt = cnt
-        return self.sim_cnt
+                self._simplified_cnt += 1 if f.is_simplified() else 0
+        return self._simplified_cnt
     
     def __str__(self):
-        return f'{self.path}\t{self.get_traditional_cnt()}\t{self.get_simplified_cnt()}'
+        return f'{self._path}\t{self.traditional_cnt}\t{self.simplified_cnt}'
 
     def move(self, destination:str):
-        shutil.move(self.path, destination)
+        shutil.move(self._path, destination)
 
 class TtfSortor:
     def __init__(self, dir:str, tra_bondary:int = 9000):
-        self.dir = os.path.abspath(dir)
-        self.ttf_files = []
-        self.tra_bondary = tra_bondary
+        self._dir = os.path.abspath(dir)
+        self._ttf_files = []
+        self._tra_bondary = tra_bondary
     
-    def get_all_ttf_files(self) -> list[TtfFile]:
-        for file_path in os.listdir(self.dir):
-            if file_path.upper().endswith('.TTF'):
-                p = os.path.abspath(self.dir + '/' + file_path)
-                f = TtfFile(p)
-                self.ttf_files.append(f)
-        return self.ttf_files
+    @property
+    def ttf_files(self) -> list[TtfFile]:
+        if len(self._ttf_files) == 0:
+            for file_path in os.listdir(self._dir):
+                if file_path.upper().endswith('.TTF'):
+                    p = os.path.abspath(self._dir + '/' + file_path)
+                    f = TtfFile(p)
+                    self._ttf_files.append(f)
+        return self._ttf_files
 
     def classify(self):
-        traditional_dir = self.dir + '/traditional'
-        simplified_dir = self.dir + '/simplified'
+        traditional_dir = self._dir + '/traditional'
+        simplified_dir = self._dir + '/simplified'
         if not os.path.exists(traditional_dir):
             os.mkdir(traditional_dir)
         if not os.path.exists(simplified_dir):
             os.mkdir(simplified_dir)
         
         for f in self.ttf_files:
-            f.parse()
-            tra_cnt = f.get_traditional_cnt()
-            if tra_cnt > self.tra_bondary:
+            tra_cnt = f.traditional_cnt
+            if tra_cnt > self._tra_bondary:
                 f.move(traditional_dir)
             else:
                 f.move(simplified_dir)
     
-    def print_support_fonts_cnt(self):
+    def print_ch_fonts_cnt(self):
         for f in self.ttf_files:
             print(f)
 
@@ -106,13 +117,13 @@ if __name__ == '__main__':
 
     mode = sys.argv[1]
     dir_path = sys.argv[2]
-    if mode.upper() == 'print':
+    if mode.lower() == 'print':
         sorter = TtfSortor(dir_path)
-    elif mode.upper() == 'classify':
+        sorter.print_ch_fonts_cnt()
+    elif mode.lower() == 'classify':
         tra_bondary = 9000
-        if argLen == 3 and str.isnumeric(sys.argv[3]):
-            tra_bondary = int(sys.argv[3])
+        if argLen == 4 and str.isnumeric(sys.argv[3]):
+            tra_bondary = int(sys.argv[3]) 
         
         sorter = TtfSortor(dir_path, tra_bondary)
-        sorter.get_all_ttf_files()
         sorter.classify()
